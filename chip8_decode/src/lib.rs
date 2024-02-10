@@ -1,6 +1,6 @@
 mod errors;
 pub(crate) use errors::Result;
 
-mod instructions;
-mod reg;
-mod numtypes;
+pub mod instructions;
+pub mod reg;
+pub mod numtypes;

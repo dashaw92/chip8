@@ -158,7 +158,7 @@ pub(crate) enum DecodeErr {
 }
 
 impl Instr {
-    fn decode(value: u16) -> Result<Self> {
+    pub fn decode(value: u16) -> Result<Self> {
         let nibbles = value.nibbles();
 
         let byte = |hi, lo| hi << 4 | lo;
