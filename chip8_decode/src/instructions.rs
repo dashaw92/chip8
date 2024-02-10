@@ -1,6 +1,7 @@
 //http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
-use crate::{numtypes::{u12, u4}, reg::GPReg};
+use crate::Result;
+use crate::{errors::Error, numtypes::{u12, u4, Nibbles}, reg::GPReg};
 
 type Addr = u12;
 
@@ -148,8 +149,65 @@ pub enum Instr {
     POPREG(GPReg),
 }
 
-impl From<u16> for Instr {
-    fn from(value: u16) -> Self {
-        unimplemented!()
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum DecodeErr {
+    Opcode(u16),
+    Subcode(u8, u8),
+    Reg(u16, u8),
+
+}
+
+impl Instr {
+    fn decode(value: u16) -> Result<Self> {
+        let nibbles = value.nibbles();
+
+        let byte = |hi, lo| hi << 4 | lo;
+        let addr = u12::from_nibbles;
+        let gpreg = |idx| GPReg::indexed(idx).ok_or(Error::InstrErr(DecodeErr::Reg(value, idx)));
+
+        Ok(match nibbles {
+            [0x0, 0x0, 0xE, 0x0] => Instr::CLS,
+            [0x0, 0x0, 0xE, 0xE] => Instr::RET,
+            [0x1, hi, mid, lo] => Instr::JP(addr(hi, mid, lo)),
+            [0x2, hi, mid, lo] => Instr::CALL(addr(hi, mid, lo)),
+            [0x3, reg, hi, lo] => Instr::SEQ(gpreg(reg)?, byte(hi, lo)),
+            [0x4, reg, hi, lo] => Instr::SNELIT(gpreg(reg)?, byte(hi, lo)),
+            [0x5, reg1, reg2, 0x0] => Instr::SE(gpreg(reg1)?, gpreg(reg2)?),
+            [0x6, reg, hi, lo] => Instr::LDL(gpreg(reg)?, byte(hi, lo)),
+            [0x7, reg, hi, lo] => Instr::ADDL(gpreg(reg)?, byte(hi, lo)),
+            [0x8, reg1, reg2, op] => {
+                let reg1 = gpreg(reg1)?;
+                let reg2 = gpreg(reg2)?;
+                match op {
+                    0x0 => Instr::LD(reg1, reg2),
+                    0x1 => Instr::OR(reg1, reg2),
+                    0x2 => Instr::AND(reg1, reg2),
+                    0x3 => Instr::XOR(reg1, reg2),
+                    0x4 => Instr::ADDC(reg1, reg2),
+                    0x5 => Instr::SUBC(reg1, reg2),
+                    0x6 => Instr::SHRC(reg1, reg2),
+                    0x7 => Instr::SUBN(reg1, reg2),
+                    0xE => Instr::SHLC(reg1, reg2),
+                    _ => return Err(Error::InstrErr(DecodeErr::Subcode(0x8, op))),
+                }
+            },
+            [0x9, reg1, reg2, 0x0] => Instr::SNE(gpreg(reg1)?, gpreg(reg2)?),
+            [0xA, hi, mid, lo] => Instr::LDI(addr(hi, mid, lo)),
+            [0xB, hi, mid, lo] => Instr::JP(addr(hi, mid, lo)),
+            [0xC, reg, hi, lo] => Instr::RND(gpreg(reg)?, byte(hi, lo)),
+            [0xD, reg1, reg2, nib] => Instr::DRW(gpreg(reg1)?, gpreg(reg2)?, u4::of(nib)),
+            [0xE, reg, 0x9, 0xE] => Instr::SKP(gpreg(reg)?),
+            [0xE, reg, 0xA, 0x1] => Instr::SKNP(gpreg(reg)?),
+            [0xF, reg, 0x0, 0x7] => Instr::MOVDT(gpreg(reg)?),
+            [0xF, reg, 0x0, 0xA] => Instr::LDKB(gpreg(reg)?),
+            [0xF, reg, 0x1, 0x5] => Instr::LDDT(gpreg(reg)?),
+            [0xF, reg, 0x1, 0x8] => Instr::LDST(gpreg(reg)?),
+            [0xF, reg, 0x1, 0xE] => Instr::ADDI(gpreg(reg)?),
+            [0xF, reg, 0x2, 0x9] => Instr::LDSPR(gpreg(reg)?),
+            [0xF, reg, 0x3, 0x3] => Instr::LDBCD(gpreg(reg)?),
+            [0xF, reg, 0x5, 0x5] => Instr::PUSHREG(gpreg(reg)?),
+            [0xF, reg, 0x6, 0x5] => Instr::POPREG(gpreg(reg)?),
+            _ => return Err(Error::InstrErr(DecodeErr::Opcode(value))),
+        })
     }
 }

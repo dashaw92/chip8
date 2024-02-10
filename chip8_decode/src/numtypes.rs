@@ -4,59 +4,76 @@ use std::ops::Deref;
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
 pub(crate) struct u12(u16);
 
-impl u12 {
-    pub fn of(val: u16) -> Self {
-        Self(val & 0xFFF)
-    }
-
-    pub fn modify(&mut self, f: impl Fn(u16) -> u16) {
-        self.0 = f(self.0) & 0xFFF;
-    }
-}
-
-impl Deref for u12 {
-    type Target = u16;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
 pub(crate) struct u4(u8);
 
-impl u4 {
-    pub fn of(val: u8) -> Self {
-        Self(val & 0xF)
-    }
-
-    pub fn modify(&mut self, f: impl Fn(u8) -> u8) {
-        self.0 = f(self.0) & 0xF;
-    }
-}
-
-impl Deref for u4 {
-    type Target = u8;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-trait Nibbles {
+pub trait Nibbles<const N: usize> {
     fn nibble_at(&self, idx: usize) -> u4;
+    fn nibbles(&self) -> [u8; N];
 }
 
-impl Nibbles for u8 {
-    fn nibble_at(&self, idx: usize) -> u4 {
-        assert!(idx < 2, "nibble idx > 1 for u8");
-        u4::of(*self >> (idx * 4))
+mod trait_impls {
+    use super::*;
+
+    impl u12 {
+        pub fn from_nibbles(hi: u8, mid: u8, lo: u8) -> u12 {
+            u12::of((hi as u16) << 8 | (mid as u16) << 4 | lo as u16)
+        }
+
+        pub fn of(val: u16) -> Self {
+            Self(val & 0xFFF)
+        }
+    
+        pub fn modify(&mut self, f: impl Fn(u16) -> u16) {
+            self.0 = f(self.0) & 0xFFF;
+        }
     }
-}
 
-impl Nibbles for u16 {
-    fn nibble_at(&self, idx: usize) -> u4 {
-        assert!(idx < 4, "nibble idx > 3 for u16");
-        u4::of((*self >> (idx * 4)) as u8)
+    impl u4 {
+        pub fn of(val: u8) -> Self {
+            Self(val & 0xF)
+        }
+
+        pub fn modify(&mut self, f: impl Fn(u8) -> u8) {
+            self.0 = f(self.0) & 0xF;
+        }
+    }
+
+    impl Deref for u4 {
+        type Target = u8;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Deref for u12 {
+        type Target = u16;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Nibbles<2> for u8 {
+        fn nibble_at(&self, idx: usize) -> u4 {
+            assert!(idx < 2, "nibble idx > 1 for u8");
+            u4::of(*self >> (idx * 4))
+        }
+
+        fn nibbles(&self) -> [u8; 2] {
+            [*self.nibble_at(1), *self.nibble_at(0)]
+        }
+    }
+    
+    impl Nibbles<4> for u16 {
+        fn nibble_at(&self, idx: usize) -> u4 {
+            assert!(idx < 4, "nibble idx > 3 for u16");
+            u4::of((*self >> (idx * 4)) as u8)
+        }
+
+        fn nibbles(&self) -> [u8; 4] {
+            [*self.nibble_at(3), *self.nibble_at(2), *self.nibble_at(1), *self.nibble_at(0)]
+        }
     }
 }
 
