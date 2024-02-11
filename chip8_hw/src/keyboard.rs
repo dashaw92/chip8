@@ -1,4 +1,4 @@
-use std::ops::{Index, IndexMut};
+use std::{io::{Read, StdinLock}, ops::{Index, IndexMut}};
 
 #[derive(Debug, Default)]
 pub struct Keyboard {
@@ -62,5 +62,37 @@ impl TryFrom<u8> for Key {
             0xF => Key::KF,
             _ => return Err(())
         })
+    }
+}
+
+pub trait Input {
+    fn wait_key(&mut self) -> Key;
+}
+
+impl Input for StdinLock<'_> {
+    fn wait_key(&mut self) -> Key {
+        let mut buf = [0x0; 1];
+        loop {
+            self.read_exact(&mut buf).expect("Failed to read input from stdin");
+            return match buf[0] {
+                b'1' => Key::K1,
+                b'2' => Key::K2,
+                b'3' => Key::K3,
+                b'4' => Key::KC,
+                b'q' => Key::K4,
+                b'w' => Key::K5,
+                b'e' => Key::K6,
+                b'r' => Key::KD,
+                b'a' => Key::K7,
+                b's' => Key::K8,
+                b'd' => Key::K9,
+                b'f' => Key::KE,
+                b'z' => Key::KA,
+                b'x' => Key::K0,
+                b'c' => Key::KB,
+                b'v' => Key::KF,
+                _ => continue,
+            }
+        }
     }
 }

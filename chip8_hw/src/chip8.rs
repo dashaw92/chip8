@@ -1,7 +1,7 @@
 use chip8_decode::instructions::Instr;
 use shared::{numtypes::u12, reg::GPReg};
 
-use crate::keyboard::{Key, Keyboard};
+use crate::keyboard::{Input, Key, Keyboard};
 
 pub const RAM_SIZE: usize = 0x1000;
 pub const ROM_MAX_SIZE: usize = 0xE00;
@@ -79,11 +79,11 @@ impl Chip8 {
         c8
     }
 
-    pub fn step(&mut self) -> Result<Instr, String> {
+    pub fn step(&mut self, input: &mut impl Input) -> Result<Instr, String> {
         
         let instr = {
             let (b1, b2) = (self.ram[self.pc as usize], self.ram[(self.pc + 1) as usize]);
-            let bytes = (b1 << 8) as u16 | b2 as u16;
+            let bytes = (b1 as u16) << 8 | b2 as u16;
             Instr::decode(bytes)
         }.map_err(|e| format!("Failed to decode instruction: {e:#?}"))?;
         
@@ -95,16 +95,16 @@ impl Chip8 {
             CLS => self.vram.fill(false),
             RET => {
                 if self.sp == 0 {
-                    return Err(format!("Stack underflow! pc = 0x{:4X}", self.pc - 2));
+                    return Err(format!("Stack underflow! pc = 0x{:04X}", self.pc - 2));
                 }
 
                 self.sp -= 1;
-                self.pc = self.stack.pop().expect("Failed to pop stack when sp != 0; sp out of sync with stack?");
+                self.pc = self.stack.pop().expect(&format!("Failed to pop stack when sp != 0; sp out of sync with stack? pc = 0x{:04X}", self.pc));
             },
             JP(addr) => self.pc = *addr,
             CALL(addr) => {
                 if self.sp as usize == STACK_LIMIT {
-                    return Err(format!("Stack overflow! pc = 0x{:4X}", self.pc - 2));
+                    return Err(format!("Stack overflow! pc = 0x{:04X}", self.pc - 2));
                 }
 
                 self.stack.push(self.pc);
@@ -128,7 +128,7 @@ impl Chip8 {
             LDL(vx, lit) => self.gpregs[vx] = lit,
             ADDL(vx, lit) => {
                 let vx_val = self.gpregs[vx];
-                self.gpregs[vx] = vx_val + lit;
+                self.gpregs[vx] = vx_val.overflowing_add(lit).0;
             },
             LD(vx, vy) => self.gpregs[vx] = self.gpregs[vy],
             OR(vx, vy) => self.gpregs[vx] = self.gpregs[vx] | self.gpregs[vy],
@@ -168,7 +168,26 @@ impl Chip8 {
                 let rng = rand::random::<u8>() & byte;
                 self.gpregs[vx] = rng;
             },
-            DRW(vx, vy, size) => todo!(),
+            DRW(vx, vy, size) => {
+                let x_start = self.gpregs[vx];
+                let y_start = self.gpregs[vy];
+
+                let spr = &self.ram[*self.i_reg as usize ..= (*self.i_reg + *size as u16) as usize];
+                for y in 0 .. *size {
+                    let byte = spr[y as usize];
+                    for x in 0 ..= 7 {
+                        let mask = 0b10000000 >> x;
+                        let bit = byte & mask == mask;
+
+                        let idx = (y_start + y) as usize * VRAM_WIDTH + ((x_start + x) as usize);
+                        if self.vram[idx] {
+                            self.gpregs[GPReg::VF] = 1;
+                        }
+
+                        self.vram[idx] ^= bit;
+                    }
+                }
+            },
             SKP(vx) => {
                 let key = Key::try_from(self.gpregs[vx]).map_err(|_| format!("Invalid key idx {}. pc = 0x{:4X}", self.gpregs[vx], self.pc))?;
                 if self.keyboard[key] {
@@ -182,14 +201,27 @@ impl Chip8 {
                 }
             },
             MOVDT(vx) => self.gpregs[vx] = self.dt,
-            LDKB(_) => todo!(),
-            LDDT(_) => todo!(),
-            LDST(_) => todo!(),
-            ADDI(_) => todo!(),
-            LDSPR(_) => todo!(),
+            LDKB(vx) => {
+                let key = input.wait_key();
+                self.gpregs[vx] = key as u8;
+            },
+            LDDT(vx) => self.dt = self.gpregs[vx],
+            LDST(vx) => self.st = self.gpregs[vx],
+            ADDI(vx) => self.i_reg.modify(|i| i + self.gpregs[vx] as u16),
+            LDSPR(vx) => self.i_reg.modify(|_| self.gpregs[vx] as u16 * 5),
             LDBCD(_) => todo!(),
-            PUSHREG(_) => todo!(),
-            POPREG(_) => todo!(),
+            PUSHREG(vx) => {
+                for (i, addr) in (*self.i_reg .. *self.i_reg + vx.to_idx() as u16).enumerate() {
+                    let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;
+                    self.ram[addr as usize] = self.gpregs[reg];
+                }
+            },
+            POPREG(vx) => {
+                for (i, addr) in (*self.i_reg .. *self.i_reg + vx.to_idx() as u16).enumerate() {
+                    let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;
+                    self.gpregs[reg] = self.ram[addr as usize];
+                }
+            },
         }
 
         Ok(instr)
