@@ -1,5 +1,5 @@
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
-pub(crate) enum GPReg {
+pub enum GPReg {
     V0,
     V1,
     V2,
@@ -17,8 +17,9 @@ pub(crate) enum GPReg {
     VE,
     VF,
 }
+
 impl GPReg {
-    pub(crate) fn indexed(reg: u8) -> Option<GPReg> {
+    pub fn indexed(reg: u8) -> Option<GPReg> {
         Some(match reg {
             0x0 => Self::V0,
             0x1 => Self::V1,
@@ -38,5 +39,26 @@ impl GPReg {
             0xF => Self::VF,
             _ => return None,
         })
+    }
+
+    pub fn to_idx(&self) -> u8 {
+        match self {
+            Self::V0 => 0x0,
+            Self::V1 => 0x1,
+            Self::V2 => 0x2,
+            Self::V3 => 0x3,
+            Self::V4 => 0x4,
+            Self::V5 => 0x5,
+            Self::V6 => 0x6,
+            Self::V7 => 0x7,
+            Self::V8 => 0x8,
+            Self::V9 => 0x9,
+            Self::VA => 0xA,
+            Self::VB => 0xB,
+            Self::VC => 0xC,
+            Self::VD => 0xD,
+            Self::VE => 0xE,
+            Self::VF => 0xF,
+        }
     }
 }

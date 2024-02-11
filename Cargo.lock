@@ -7,8 +7,24 @@ name = "chip8"
 version = "0.1.0"
 dependencies = [
  "chip8_decode",
+ "chip8_hw",
 ]
 
 [[package]]
 name = "chip8_decode"
+version = "0.1.0"
+dependencies = [
+ "chip8_hw",
+ "shared",
+]
+
+[[package]]
+name = "chip8_hw"
+version = "0.1.0"
+dependencies = [
+ "shared",
+]
+
+[[package]]
+name = "shared"
 version = "0.1.0"

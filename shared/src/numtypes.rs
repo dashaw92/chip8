@@ -2,11 +2,11 @@ use std::ops::Deref;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
-pub(crate) struct u12(u16);
+pub struct u12(u16);
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
-pub(crate) struct u4(u8);
+pub struct u4(u8);
 
 pub trait Nibbles<const N: usize> {
     fn nibble_at(&self, idx: usize) -> u4;

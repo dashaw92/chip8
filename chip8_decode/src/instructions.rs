@@ -1,7 +1,11 @@
 //http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
 use crate::Result;
-use crate::{errors::Error, numtypes::{u12, u4, Nibbles}, reg::GPReg};
+use crate::errors::Error;
+
+use chip8_hw::chip8::Chip8;
+use chip8_hw::reg::GPReg;
+use shared::numtypes::*;
 
 type Addr = u12;
 
@@ -150,7 +154,7 @@ pub enum Instr {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum DecodeErr {
+pub enum DecodeErr {
     Opcode(u16),
     Subcode(u8, u8),
     Reg(u16, u8),
@@ -209,5 +213,9 @@ impl Instr {
             [0xF, reg, 0x6, 0x5] => Instr::POPREG(gpreg(reg)?),
             _ => return Err(Error::InstrErr(DecodeErr::Opcode(value))),
         })
+    }
+
+    pub fn execute(chip8: &mut Chip8) {
+        
     }
 }
