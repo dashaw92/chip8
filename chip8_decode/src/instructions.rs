@@ -16,6 +16,10 @@ type Addr = u12;
 /// kk or byte - An 8-bit value, the lowest 8 bits of the instruction  
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
 pub enum Instr {
+    ///0nnn - SYS addr
+    ///Jump to a machine code routine at nnn.
+    ///This instruction is only used on the old computers on which Chip-8 was originally implemented. It is ignored by modern interpreters.
+    SYS(Addr),
     /// 00E0 - CLS  
     /// Clear the display.  
     CLS,
@@ -172,6 +176,7 @@ impl Instr {
         Ok(match nibbles {
             [0x0, 0x0, 0xE, 0x0] => Instr::CLS,
             [0x0, 0x0, 0xE, 0xE] => Instr::RET,
+            [0x0, hi, mid, lo]=> Instr::SYS(addr(hi, mid, lo)),
             [0x1, hi, mid, lo] => Instr::JP(addr(hi, mid, lo)),
             [0x2, hi, mid, lo] => Instr::CALL(addr(hi, mid, lo)),
             [0x3, reg, hi, lo] => Instr::SEQ(gpreg(reg)?, byte(hi, lo)),
