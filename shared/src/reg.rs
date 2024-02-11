@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Debug)]
 pub enum GPReg {
     V0,
@@ -41,7 +43,7 @@ impl GPReg {
         })
     }
 
-    pub fn to_idx(&self) -> u8 {
+    pub fn to_idx(&self) -> usize {
         match self {
             Self::V0 => 0x0,
             Self::V1 => 0x1,
@@ -62,3 +64,17 @@ impl GPReg {
         }
     }
 }
+
+impl<const N: usize> Index<GPReg> for [u8; N] {
+    type Output = u8;
+
+    fn index(&self, index: GPReg) -> &Self::Output {
+        &self[index.to_idx()]
+    }
+}
+
+impl<const N: usize> IndexMut<GPReg> for [u8; N] {
+    fn index_mut(&mut self, index: GPReg) -> &mut Self::Output {
+        &mut self[index.to_idx()]
+    }
+} 

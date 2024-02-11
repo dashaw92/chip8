@@ -3,9 +3,8 @@
 use crate::Result;
 use crate::errors::Error;
 
-use chip8_hw::chip8::Chip8;
-use chip8_hw::reg::GPReg;
 use shared::numtypes::*;
+use shared::reg::GPReg;
 
 type Addr = u12;
 
@@ -218,9 +217,5 @@ impl Instr {
             [0xF, reg, 0x6, 0x5] => Instr::POPREG(gpreg(reg)?),
             _ => return Err(Error::InstrErr(DecodeErr::Opcode(value))),
         })
-    }
-
-    pub fn execute(chip8: &mut Chip8) {
-        
     }
 }

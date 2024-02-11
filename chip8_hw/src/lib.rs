@@ -1,2 +1,2 @@
-pub mod reg;
 pub mod chip8;
+pub mod keyboard;

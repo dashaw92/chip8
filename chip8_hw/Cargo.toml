@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../shared" }
+chip8_decode = { path = "../chip8_decode" }
+rand = "~0.8"
