@@ -89,15 +89,7 @@ impl Chip8 {
         c8
     }
 
-    pub fn step(&mut self, key_fn: impl Fn() -> Option<Key>) -> Result<Instr, String> {
-        if self.dt > 0 {
-            self.dt -= 1;
-        }
-
-        if self.st > 0 {
-            self.st -= 1;
-        }
-
+    pub fn step(&mut self, next_key: Option<Key>) -> Result<Instr, String> {
         let instr = {
             let (b1, b2) = (self.ram[self.pc as usize], self.ram[(self.pc + 1) as usize]);
             let bytes = (b1 as u16) << 8 | b2 as u16;
@@ -227,7 +219,7 @@ impl Chip8 {
             },
             MOVDT(vx) => self.gpregs[vx] = self.dt,
             LDKB(vx) => {
-                let Some(key) = key_fn() else {
+                let Some(key) = next_key else {
                     self.pc -= 2;
                     return Ok(instr);
                 };
@@ -261,6 +253,14 @@ impl Chip8 {
                     self.gpregs[reg] = self.ram[addr as usize];
                 }
             },
+        }
+
+        if self.dt > 0 {
+            self.dt -= 1;
+        }
+
+        if self.st > 0 {
+            self.st -= 1;
         }
 
         Ok(instr)

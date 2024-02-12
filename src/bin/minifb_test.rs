@@ -41,9 +41,7 @@ fn main() {
             ..Default::default()
         },
     )
-    .unwrap_or_else(|e| {
-        panic!("{}", e);
-    });
+    .unwrap();
 
     // Limit to max ~60 fps update rate
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
@@ -57,7 +55,7 @@ fn main() {
         });
 
         if !c8.is_halted() {
-            match c8.step(update_keys(&window)) {
+            match c8.step(next_key(&window)) {
                 Ok(instr) => {
                     let _ = writeln!(out, "{instr:?}");
                 },
@@ -99,15 +97,15 @@ fn chip8() -> (String, Chip8) {
     (path, Chip8::load_rom(&bytes))
 }
 
-fn update_keys(window: &Window) -> impl Fn() -> Option<Key> + '_ {
-    || {
-        for key_pair in KEY_MAP {
-            if window.is_key_down(key_pair.0) {
-                return Some(key_pair.1)
-            }
-        }
-        None
-    }
+//If any key was released, return it (LDKB)
+//Otherwise, none. When LDKB checks this,
+//if it's none, the emulator will loop back to
+//the instruction. ST and DT are not updated,
+//faking "halting" the emulator until a key is ready.
+fn next_key(window: &Window) -> Option<Key> {
+    KEY_MAP.iter()
+        .find(|(fbkey, _)| window.is_key_released(*fbkey))
+        .map(|(_, key)| *key)
 }
 
 fn update_key_states(c8: &mut Chip8, window: &Window) {
