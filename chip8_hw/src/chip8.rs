@@ -242,13 +242,13 @@ impl Chip8 {
                 self.ram[*self.i_reg as usize + 2] = ones;
             },
             PUSHREG(vx) => {
-                for (i, addr) in (*self.i_reg .. *self.i_reg + vx.to_idx() as u16).enumerate() {
+                for (i, addr) in (*self.i_reg ..= *self.i_reg + vx.to_idx() as u16).enumerate() {
                     let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;
                     self.ram[addr as usize] = self.gpregs[reg];
                 }
             },
             POPREG(vx) => {
-                for (i, addr) in (*self.i_reg .. *self.i_reg + vx.to_idx() as u16).enumerate() {
+                for (i, addr) in (*self.i_reg ..= *self.i_reg + vx.to_idx() as u16).enumerate() {
                     let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;
                     self.gpregs[reg] = self.ram[addr as usize];
                 }
