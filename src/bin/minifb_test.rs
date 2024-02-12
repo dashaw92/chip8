@@ -7,6 +7,7 @@ pub const SCALE: u32 = 8;
 
 fn main() {
     let (rom_name, mut c8) = chip8();
+    let (active, halted) = (format!("chip8 - {rom_name}"), format!("<HALTED> - chip8 - {rom_name}"));
     let stdin = std::io::stdin();
     let mut lock = stdin.lock();
 
@@ -15,7 +16,7 @@ fn main() {
 
     let mut buffer: Vec<u32> = vec![0; VRAM_WH];
     let mut window = Window::new(
-        &format!("chip8 - {rom_name}"),
+        &active,
         VRAM_WIDTH,
         VRAM_HEIGHT,
         WindowOptions {
@@ -31,11 +32,12 @@ fn main() {
     // Limit to max ~60 fps update rate
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
+
     while window.is_open() && !window.is_key_down(FBKey::Escape) {
-        window.set_title(&if c8.is_halted() {
-            format!("<HALTED> - chip8 - {rom_name}")
+        window.set_title(if c8.is_halted() {
+            &active
         } else {
-            format!("chip8 - {rom_name}")
+            &halted
         });
 
         if !c8.is_halted() {
