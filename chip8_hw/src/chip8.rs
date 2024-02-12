@@ -24,7 +24,28 @@ pub struct Chip8 {
     pub vram: [bool; VRAM_WH],
     pub keyboard: Keyboard,
     halted: bool,
+    quirks: Quirks,
 }
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Quirks {
+    /// VF is reset to 0 for AND, OR, and XOR opcodes
+    pub vf_reset: bool,
+    /// PUSHREG and POPREG modify the value of I
+    pub memory: bool,
+}
+
+#[allow(private_interfaces)]
+pub static QUIRKS_OLD: Quirks = Quirks {
+    vf_reset: true,
+    memory: false,
+};
+
+#[allow(private_interfaces)]
+pub static QUIRKS_NEW: Quirks = Quirks {
+    vf_reset: true,
+    memory: true,
+};
 
 static FONT: [[u8; 5]; 0x10] = [
     [0xF0, 0x90, 0x90, 0x90, 0xF0], //0
@@ -63,7 +84,7 @@ impl Chip8 {
         self.halted = halt;
     }
 
-    pub fn load_rom(rom: &[u8]) -> Self {
+    pub fn load_rom(quirks: Quirks, rom: &[u8]) -> Self {
         assert!(rom.len() < ROM_MAX_SIZE, "ROM is too large! Must be at most {ROM_MAX_SIZE} bytes!");
 
         let mut c8 = Self {
@@ -78,6 +99,7 @@ impl Chip8 {
             vram: [false; VRAM_WH],
             keyboard: Keyboard::default(),
             halted: false,
+            quirks,
         };
 
         Self::copy_font(&mut c8.ram[0..=0x4F]);
@@ -146,9 +168,24 @@ impl Chip8 {
                 self.gpregs[vx] = vx_val.overflowing_add(lit).0;
             },
             LD(vx, vy) => self.gpregs[vx] = self.gpregs[vy],
-            OR(vx, vy) => self.gpregs[vx] = self.gpregs[vx] | self.gpregs[vy],
-            AND(vx, vy) => self.gpregs[vx] = self.gpregs[vx] & self.gpregs[vy],
-            XOR(vx, vy) => self.gpregs[vx] = self.gpregs[vx] ^ self.gpregs[vy],
+            OR(vx, vy) => {
+                self.gpregs[vx] = self.gpregs[vx] | self.gpregs[vy];
+                if self.quirks.vf_reset {
+                    self.gpregs[GPReg::VF] = 0;
+                }
+            },
+            AND(vx, vy) => {
+                self.gpregs[vx] = self.gpregs[vx] & self.gpregs[vy];
+                if self.quirks.vf_reset {
+                    self.gpregs[GPReg::VF] = 0;
+                }
+            },
+            XOR(vx, vy) => {
+                self.gpregs[vx] = self.gpregs[vx] ^ self.gpregs[vy];
+                if self.quirks.vf_reset {
+                    self.gpregs[GPReg::VF] = 0;
+                }
+            },
             ADDC(vx, vy) => {
                 let (out, carry) = self.gpregs[vx].overflowing_add(self.gpregs[vy]);
                 self.gpregs[vx] = out;
@@ -160,8 +197,9 @@ impl Chip8 {
                 self.gpregs[GPReg::VF] = !carry as u8;
             },
             SHRC(vx, _) => {
-                self.gpregs[GPReg::VF] = (self.gpregs[vx] & 0x1 == 1) as u8;
+                let vx_val = self.gpregs[vx];
                 self.gpregs[vx] >>= 1;
+                self.gpregs[GPReg::VF] = (vx_val & 0x1 == 1) as u8;
             },
             SUBN(vx, vy) => {
                 let (out, carry) = self.gpregs[vy].overflowing_sub(self.gpregs[vx]);
@@ -169,8 +207,9 @@ impl Chip8 {
                 self.gpregs[GPReg::VF] = !carry as u8;
             },
             SHLC(vx, _) => {
-                self.gpregs[GPReg::VF] = (self.gpregs[vx] & 0b10000000 == 1) as u8;
+                let vx_val = self.gpregs[vx];
                 self.gpregs[vx] <<= 1;
+                self.gpregs[GPReg::VF] = (vx_val & 0b10000000 == 0b10000000) as u8;
             },
             SNE(vx, vy) => {
                 if self.gpregs[vx] != self.gpregs[vy] {
@@ -186,8 +225,16 @@ impl Chip8 {
             DRW(vx, vy, size) => {
                 self.gpregs[GPReg::VF] = 0;
 
-                let x_start = self.gpregs[vx];
-                let y_start = self.gpregs[vy];
+                let mut x_start = self.gpregs[vx] as usize;
+                let mut y_start = self.gpregs[vy] as usize;
+
+                if x_start > VRAM_WIDTH {
+                    x_start = 0;
+                }
+
+                if y_start > VRAM_HEIGHT {
+                    y_start = 0;
+                }
 
                 let spr = &self.ram[*self.i_reg as usize ..= (*self.i_reg + *size as u16) as usize];
                 for y in 0 .. *size {
@@ -196,7 +243,14 @@ impl Chip8 {
                         let mask = 0b10000000 >> x;
                         let bit = byte & mask == mask;
 
-                        let idx = ((y_start + y) as usize * VRAM_WIDTH + ((x_start + x) as usize)).min(2047);
+                        let y_coord = y_start + y as usize;
+                        let x_coord = x_start + x as usize;
+
+                        if y_coord >= VRAM_HEIGHT || x_coord >= VRAM_WIDTH {
+                            continue;
+                        }
+
+                        let idx = y_coord * VRAM_WIDTH + x_coord;
                         if self.vram[idx] {
                             self.gpregs[GPReg::VF] = 1;
                         }
@@ -246,11 +300,19 @@ impl Chip8 {
                     let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;
                     self.ram[addr as usize] = self.gpregs[reg];
                 }
+
+                if self.quirks.memory {
+                    self.i_reg.modify(|i| i + vx.to_idx() as u16 + 1);
+                }
             },
             POPREG(vx) => {
                 for (i, addr) in (*self.i_reg ..= *self.i_reg + vx.to_idx() as u16).enumerate() {
                     let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;
                     self.gpregs[reg] = self.ram[addr as usize];
+                }
+
+                if self.quirks.memory {
+                    self.i_reg.modify(|i| i + vx.to_idx() as u16 + 1);
                 }
             },
         }

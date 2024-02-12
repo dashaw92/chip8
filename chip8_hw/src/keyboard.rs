@@ -7,21 +7,21 @@ pub struct Keyboard {
 
 #[derive(PartialOrd, Ord, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Key {
+    K0,
     K1,
     K2,
     K3,
-    KC,
     K4,
     K5,
     K6,
-    KD,
     K7,
     K8,
     K9,
-    KE,
     KA,
-    K0,
     KB,
+    KC,
+    KD,
+    KE,
     KF,
 }
 
@@ -44,21 +44,21 @@ impl TryFrom<u8> for Key {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         Ok(match value {
-            0x0 => Key::K1,
-            0x1 => Key::K2,
-            0x2 => Key::K3,
-            0x3 => Key::KC,
+            0x0 => Key::K0,
+            0x1 => Key::K1,
+            0x2 => Key::K2,
+            0x3 => Key::K3,
             0x4 => Key::K4,
             0x5 => Key::K5,
             0x6 => Key::K6,
-            0x7 => Key::KD,
-            0x8 => Key::K7,
-            0x9 => Key::K8,
-            0xA => Key::K9,
-            0xB => Key::KE,
-            0xC => Key::KA,
-            0xD => Key::K0,
-            0xE => Key::KB,
+            0x7 => Key::K7,
+            0x8 => Key::K8,
+            0x9 => Key::K9,
+            0xA => Key::KA,
+            0xB => Key::KB,
+            0xC => Key::KC,
+            0xD => Key::KD,
+            0xE => Key::KE,
             0xF => Key::KF,
             _ => return Err(())
         })

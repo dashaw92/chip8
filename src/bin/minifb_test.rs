@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{Read, Write};
-use chip8_hw::chip8::{Chip8, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
+use chip8_hw::chip8::{Chip8, QUIRKS_NEW, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
 use chip8_hw::keyboard::Key;
 use minifb::{Key as FBKey, KeyRepeat, Window, WindowOptions};
 
@@ -43,9 +43,6 @@ fn main() {
     )
     .unwrap();
 
-    // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
-
     while window.is_open() && !window.is_key_down(FBKey::Escape) {
         update_key_states(&mut c8, &window);
         window.set_title(if c8.is_halted() {
@@ -56,24 +53,21 @@ fn main() {
 
         if !c8.is_halted() {
             match c8.step(next_key(&window)) {
-                Ok(instr) => {
-                    let _ = writeln!(out, "{instr:?}");
-                },
                 Err(e) => {
                     let _ = writeln!(out, "Execution halted: {e:?}.");
                     c8.set_halted(true);
                 }
+                _ => {},
             }
 
-            for y in 0..VRAM_HEIGHT {
-                for x in 0..VRAM_WIDTH {
-                    let idx = y * VRAM_WIDTH + x;
-                    buffer[idx] = match c8.vram[idx] {
-                        true => 0x00FFAA00,
-                        false => 0,
+            buffer.iter_mut().enumerate()
+                .for_each(|(idx, pix)| {
+                    *pix = if c8.vram[idx] {
+                        0x00FFAA00
+                    } else {
+                        0
                     };
-                }
-            }
+                });
         }
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
@@ -94,7 +88,7 @@ fn chip8() -> (String, Chip8) {
         .filter_map(|byte| byte.ok())
         .collect();
     
-    (path, Chip8::load_rom(&bytes))
+    (path, Chip8::load_rom(QUIRKS_NEW, &bytes))
 }
 
 //If any key was released, return it (LDKB)

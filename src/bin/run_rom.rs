@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::time::Duration;
 
-use chip8_hw::chip8::{Chip8, VRAM_HEIGHT, VRAM_WIDTH};
+use chip8_hw::chip8::{Chip8, QUIRKS_NEW, VRAM_HEIGHT, VRAM_WIDTH};
 
 fn main() {
     let path = std::env::args().nth(1).unwrap_or("rom.c8".into());
@@ -11,7 +11,7 @@ fn main() {
         .filter_map(|byte| byte.ok())
         .collect();
     
-    let mut c8 = Chip8::load_rom(&bytes);
+    let mut c8 = Chip8::load_rom(QUIRKS_NEW, &bytes);
 
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
