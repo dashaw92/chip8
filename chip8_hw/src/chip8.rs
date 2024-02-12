@@ -9,7 +9,7 @@ pub const STACK_LIMIT: usize = 0x10;
 
 pub const VRAM_WIDTH: usize = 64;
 pub const VRAM_HEIGHT: usize = 32;
-pub const VRAM_WH: usize = 64 * 32;
+pub const VRAM_WH: usize = (64 * 32) + 1;
 
 #[derive(Debug)]
 pub struct Chip8 {
@@ -23,6 +23,7 @@ pub struct Chip8 {
     pub stack: Vec<u16>,
     pub vram: [bool; VRAM_WH],
     pub keyboard: Keyboard,
+    halted: bool,
 }
 
 static FONT: [[u8; 5]; 0x10] = [
@@ -54,6 +55,14 @@ impl Chip8 {
             .for_each(|(idx, &byte)| ram[idx] = byte);
     }
 
+    pub fn is_halted(&self) -> bool {
+        self.halted
+    }
+
+    pub fn set_halted(&mut self, halt: bool) {
+        self.halted = halt;
+    }
+
     pub fn load_rom(rom: &[u8]) -> Self {
         assert!(rom.len() < ROM_MAX_SIZE, "ROM is too large! Must be at most {ROM_MAX_SIZE} bytes!");
 
@@ -68,6 +77,7 @@ impl Chip8 {
             stack: vec![0x00; STACK_LIMIT],
             vram: [false; VRAM_WH],
             keyboard: Keyboard::default(),
+            halted: false,
         };
 
         Self::copy_font(&mut c8.ram[0..=0x4F]);
@@ -101,7 +111,12 @@ impl Chip8 {
                 self.sp -= 1;
                 self.pc = self.stack.pop().expect(&format!("Failed to pop stack when sp != 0; sp out of sync with stack? pc = 0x{:04X}", self.pc));
             },
-            JP(addr) => self.pc = *addr,
+            JP(addr) => {
+                if self.pc - 2 == *addr {
+                    self.halted = true;
+                }
+                self.pc = *addr;
+            },
             CALL(addr) => {
                 if self.sp as usize == STACK_LIMIT {
                     return Err(format!("Stack overflow! pc = 0x{:04X}", self.pc - 2));
@@ -179,7 +194,7 @@ impl Chip8 {
                         let mask = 0b10000000 >> x;
                         let bit = byte & mask == mask;
 
-                        let idx = (y_start + y) as usize * VRAM_WIDTH + ((x_start + x) as usize);
+                        let idx = ((y_start + y) as usize * VRAM_WIDTH + ((x_start + x) as usize)).min(2047);
                         if self.vram[idx] {
                             self.gpregs[GPReg::VF] = 1;
                         }

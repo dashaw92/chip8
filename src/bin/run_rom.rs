@@ -5,7 +5,6 @@ use std::time::Duration;
 use chip8_hw::chip8::{Chip8, VRAM_HEIGHT, VRAM_WIDTH};
 
 fn main() {
-    // test();
     let path = std::env::args().nth(1).unwrap_or("rom.c8".into());
     let file = File::open(&path).expect(&format!("Failed to open file \"{path}\" (does it exist?)"));
     let bytes: Vec<u8> = file.bytes()

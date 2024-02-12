@@ -9,3 +9,4 @@ edition = "2021"
 [dependencies]
 chip8_decode = { path = "chip8_decode" }
 chip8_hw = { path = "chip8_hw" }
+minifb = "0.25"
