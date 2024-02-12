@@ -17,7 +17,7 @@ fn main() {
     let mut out = stdout.lock();
 
     loop {
-        let result = c8.step();
+        let result = c8.step(|| None);
 
         match result {
             // Ok(instr) => println!("{instr:?}"),

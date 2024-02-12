@@ -4,13 +4,6 @@ use std::ops::{Index, IndexMut};
 pub struct Keyboard {
     states: [bool; 0x10],
 }
-impl Keyboard {
-    pub(crate) fn key_pressed(&self) -> Option<Key> {
-        (0..self.states.len())
-            .find(|&pressed| self.states[pressed])
-            .map(|key| Key::try_from(key as u8).unwrap())
-    }
-}
 
 #[derive(PartialOrd, Ord, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Key {

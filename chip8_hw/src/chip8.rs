@@ -9,7 +9,7 @@ pub const STACK_LIMIT: usize = 0x10;
 
 pub const VRAM_WIDTH: usize = 64;
 pub const VRAM_HEIGHT: usize = 32;
-pub const VRAM_WH: usize = (64 * 32) + 1;
+pub const VRAM_WH: usize = 64 * 32;
 
 #[derive(Debug)]
 pub struct Chip8 {
@@ -89,7 +89,7 @@ impl Chip8 {
         c8
     }
 
-    pub fn step(&mut self) -> Result<Instr, String> {
+    pub fn step(&mut self, key_fn: impl Fn() -> Option<Key>) -> Result<Instr, String> {
         if self.dt > 0 {
             self.dt -= 1;
         }
@@ -227,7 +227,7 @@ impl Chip8 {
             },
             MOVDT(vx) => self.gpregs[vx] = self.dt,
             LDKB(vx) => {
-                let Some(key) = self.keyboard.key_pressed() else {
+                let Some(key) = key_fn() else {
                     self.pc -= 2;
                     return Ok(instr);
                 };

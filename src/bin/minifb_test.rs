@@ -4,7 +4,24 @@ use chip8_hw::chip8::{Chip8, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
 use chip8_hw::keyboard::Key;
 use minifb::{Key as FBKey, KeyRepeat, Window, WindowOptions};
 
-pub const SCALE: u32 = 8;
+static KEY_MAP: &[(FBKey, Key)] = &[
+    (FBKey::Key1, Key::K1),
+    (FBKey::Key2, Key::K2),
+    (FBKey::Key3, Key::K3),
+    (FBKey::Key4, Key::KC),
+    (FBKey::Q   , Key::K4),
+    (FBKey::W   , Key::K5),
+    (FBKey::E   , Key::K6),
+    (FBKey::R   , Key::KD),
+    (FBKey::A   , Key::K7),
+    (FBKey::S   , Key::K8),
+    (FBKey::D   , Key::K9),
+    (FBKey::F   , Key::KE),
+    (FBKey::Z   , Key::KA),
+    (FBKey::X   , Key::K0),
+    (FBKey::C   , Key::KB),
+    (FBKey::V   , Key::KF),
+];
 
 fn main() {
     let (rom_name, mut c8) = chip8();
@@ -32,6 +49,7 @@ fn main() {
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     while window.is_open() && !window.is_key_down(FBKey::Escape) {
+        update_key_states(&mut c8, &window);
         window.set_title(if c8.is_halted() {
             &halted
         } else {
@@ -39,8 +57,7 @@ fn main() {
         });
 
         if !c8.is_halted() {
-            update_keys(&mut c8, &window.get_keys_pressed(KeyRepeat::Yes));
-            match c8.step() {
+            match c8.step(update_keys(&window)) {
                 Ok(instr) => {
                     let _ = writeln!(out, "{instr:?}");
                 },
@@ -82,34 +99,26 @@ fn chip8() -> (String, Chip8) {
     (path, Chip8::load_rom(&bytes))
 }
 
-fn update_keys(c8: &mut Chip8, keys: &[FBKey]) {
-    let mut pressed = Vec::with_capacity(0x10);
-    for key in keys {
-        let c8key = match key {
-            FBKey::Key1 => Key::K1,
-            FBKey::Key2 => Key::K2,
-            FBKey::Key3 => Key::K3,
-            FBKey::Key4 => Key::KC,
-            FBKey::Q => Key::K4,
-            FBKey::W => Key::K5,
-            FBKey::E => Key::K6,
-            FBKey::R => Key::KD,
-            FBKey::A => Key::K7,
-            FBKey::S => Key::K8,
-            FBKey::D => Key::K9,
-            FBKey::F => Key::KE,
-            FBKey::Z => Key::KA,
-            FBKey::X => Key::K0,
-            FBKey::C => Key::KB,
-            FBKey::V => Key::KF,
-            _ => continue,
-        };
-        pressed.push(c8key);
-        c8.keyboard[c8key] = true;
+fn update_keys(window: &Window) -> impl Fn() -> Option<Key> + '_ {
+    || {
+        for key_pair in KEY_MAP {
+            if window.is_key_down(key_pair.0) {
+                return Some(key_pair.1)
+            }
+        }
+        None
     }
+}
 
-    (Key::K1 as u8 ..= Key::KF as u8)
-        .map(|button| Key::try_from(button).unwrap())
-        .filter(|key| !pressed.contains(key))
-        .for_each(|key| c8.keyboard[key] = false);
+fn update_key_states(c8: &mut Chip8, window: &Window) {
+    let pressed = window.get_keys();
+    let released = window.get_keys_released();
+
+    for (fbkey, key) in KEY_MAP {
+        if pressed.contains(fbkey) {
+            c8.keyboard[*key] = true;
+        } else if released.contains(fbkey) {
+            c8.keyboard[*key] = false;
+        }
+    }
 }
