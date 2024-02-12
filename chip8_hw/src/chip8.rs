@@ -1,7 +1,7 @@
 use chip8_decode::instructions::Instr;
 use shared::{numtypes::u12, reg::GPReg};
 
-use crate::keyboard::{Input, Key, Keyboard};
+use crate::keyboard::{Key, Keyboard};
 
 pub const RAM_SIZE: usize = 0x1000;
 pub const ROM_MAX_SIZE: usize = 0xE00;
@@ -89,8 +89,15 @@ impl Chip8 {
         c8
     }
 
-    pub fn step(&mut self, input: &mut impl Input) -> Result<Instr, String> {
-        
+    pub fn step(&mut self) -> Result<Instr, String> {
+        if self.dt > 0 {
+            self.dt -= 1;
+        }
+
+        if self.st > 0 {
+            self.st -= 1;
+        }
+
         let instr = {
             let (b1, b2) = (self.ram[self.pc as usize], self.ram[(self.pc + 1) as usize]);
             let bytes = (b1 as u16) << 8 | b2 as u16;
@@ -122,6 +129,7 @@ impl Chip8 {
                     return Err(format!("Stack overflow! pc = 0x{:04X}", self.pc - 2));
                 }
 
+                self.sp += 1;
                 self.stack.push(self.pc);
                 self.pc = *addr;
             },
@@ -217,7 +225,10 @@ impl Chip8 {
             },
             MOVDT(vx) => self.gpregs[vx] = self.dt,
             LDKB(vx) => {
-                let key = input.wait_key();
+                let Some(key) = self.keyboard.key_pressed() else {
+                    self.pc -= 2;
+                    return Ok(instr);
+                };
                 self.gpregs[vx] = key as u8;
             },
             LDDT(vx) => self.dt = self.gpregs[vx],

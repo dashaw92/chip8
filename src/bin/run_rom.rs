@@ -13,14 +13,11 @@ fn main() {
     
     let mut c8 = Chip8::load_rom(&bytes);
 
-    let stdin = std::io::stdin();
-    let mut lock = stdin.lock();
-
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
 
     loop {
-        let result = c8.step(&mut lock);
+        let result = c8.step();
 
         match result {
             // Ok(instr) => println!("{instr:?}"),

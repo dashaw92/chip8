@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use chip8_hw::chip8::{Chip8, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
+use chip8_hw::keyboard::Key;
 use minifb::{Key as FBKey, KeyRepeat, Window, WindowOptions};
 
 pub const SCALE: u32 = 8;
@@ -8,8 +9,6 @@ pub const SCALE: u32 = 8;
 fn main() {
     let (rom_name, mut c8) = chip8();
     let (active, halted) = (format!("chip8 - {rom_name}"), format!("<HALTED> - chip8 - {rom_name}"));
-    let stdin = std::io::stdin();
-    let mut lock = stdin.lock();
 
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -40,7 +39,8 @@ fn main() {
         });
 
         if !c8.is_halted() {
-            match c8.step(&mut lock) {
+            update_keys(&mut c8, &window.get_keys_pressed(KeyRepeat::Yes));
+            match c8.step() {
                 Ok(instr) => {
                     let _ = writeln!(out, "{instr:?}");
                 },
@@ -80,4 +80,36 @@ fn chip8() -> (String, Chip8) {
         .collect();
     
     (path, Chip8::load_rom(&bytes))
+}
+
+fn update_keys(c8: &mut Chip8, keys: &[FBKey]) {
+    let mut pressed = Vec::with_capacity(0x10);
+    for key in keys {
+        let c8key = match key {
+            FBKey::Key1 => Key::K1,
+            FBKey::Key2 => Key::K2,
+            FBKey::Key3 => Key::K3,
+            FBKey::Key4 => Key::KC,
+            FBKey::Q => Key::K4,
+            FBKey::W => Key::K5,
+            FBKey::E => Key::K6,
+            FBKey::R => Key::KD,
+            FBKey::A => Key::K7,
+            FBKey::S => Key::K8,
+            FBKey::D => Key::K9,
+            FBKey::F => Key::KE,
+            FBKey::Z => Key::KA,
+            FBKey::X => Key::K0,
+            FBKey::C => Key::KB,
+            FBKey::V => Key::KF,
+            _ => continue,
+        };
+        pressed.push(c8key);
+        c8.keyboard[c8key] = true;
+    }
+
+    (Key::K1 as u8 ..= Key::KF as u8)
+        .map(|button| Key::try_from(button).unwrap())
+        .filter(|key| !pressed.contains(key))
+        .for_each(|key| c8.keyboard[key] = false);
 }
