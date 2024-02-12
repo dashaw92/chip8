@@ -224,7 +224,18 @@ impl Chip8 {
             LDST(vx) => self.st = self.gpregs[vx],
             ADDI(vx) => self.i_reg.modify(|i| i + self.gpregs[vx] as u16),
             LDSPR(vx) => self.i_reg.modify(|_| self.gpregs[vx] as u16 * 5),
-            LDBCD(_) => todo!(),
+            LDBCD(vx) => {
+                let mut vx_val = self.gpregs[vx];
+                let ones = vx_val % 10;
+                vx_val /= 10;
+                let tens = vx_val % 10;
+                vx_val /= 10;
+                let hund = vx_val % 10;
+
+                self.ram[*self.i_reg as usize + 0] = hund;
+                self.ram[*self.i_reg as usize + 1] = tens;
+                self.ram[*self.i_reg as usize + 2] = ones;
+            },
             PUSHREG(vx) => {
                 for (i, addr) in (*self.i_reg .. *self.i_reg + vx.to_idx() as u16).enumerate() {
                     let reg = GPReg::indexed(i as u8).ok_or(format!("Invalid GPReg {}", i))?;

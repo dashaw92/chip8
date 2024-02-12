@@ -32,12 +32,11 @@ fn main() {
     // Limit to max ~60 fps update rate
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
-
     while window.is_open() && !window.is_key_down(FBKey::Escape) {
         window.set_title(if c8.is_halted() {
-            &active
-        } else {
             &halted
+        } else {
+            &active
         });
 
         if !c8.is_halted() {
