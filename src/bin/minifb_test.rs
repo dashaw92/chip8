@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{Read, Write};
+use chip8_decode::instructions::Instr;
 use chip8_hw::chip8::{Chip8, QUIRKS_NEW, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
 use chip8_hw::keyboard::Key;
 use minifb::{Key as FBKey, KeyRepeat, Window, WindowOptions};
@@ -30,8 +31,8 @@ fn main() {
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
 
-    let mut buffer: Vec<u32> = vec![0; VRAM_WH];
-    let mut window = Window::new(
+    let mut display_buf: Vec<u32> = vec![0; VRAM_WH];
+    let mut display = Window::new(
         &active,
         VRAM_WIDTH,
         VRAM_HEIGHT,
@@ -40,27 +41,29 @@ fn main() {
             scale: minifb::Scale::X8,
             ..Default::default()
         },
-    )
-    .unwrap();
+    ).expect("Failed to create c8 display window.");
 
-    while window.is_open() && !window.is_key_down(FBKey::Escape) {
-        update_key_states(&mut c8, &window);
-        window.set_title(if c8.is_halted() {
+
+    let mut do_one_step = false;
+
+    while display.is_open() && !display.is_key_down(FBKey::Escape) {
+        update_key_states(&mut c8, &display);
+        display.set_title(if c8.is_halted() {
             &halted
         } else {
             &active
         });
 
         if !c8.is_halted() {
-            match c8.step(next_key(&window)) {
+            match c8.step(next_key(&display)) {
                 Err(e) => {
                     let _ = writeln!(out, "Execution halted: {e:?}.");
                     c8.set_halted(true);
                 }
-                _ => {},
+                Ok(ins) => print_env(&mut out, &c8, ins),
             }
 
-            buffer.iter_mut().enumerate()
+            display_buf.iter_mut().enumerate()
                 .for_each(|(idx, pix)| {
                     *pix = if c8.vram[idx] {
                         0x00FFAA00
@@ -71,12 +74,20 @@ fn main() {
         }
 
         // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
-        window
-            .update_with_buffer(&buffer, VRAM_WIDTH, VRAM_HEIGHT)
+        display
+            .update_with_buffer(&display_buf, VRAM_WIDTH, VRAM_HEIGHT)
             .unwrap();
+        
+        if do_one_step {
+            c8.set_halted(true);
+            do_one_step = false;
+        }
 
-        if window.is_key_pressed(FBKey::Space, KeyRepeat::No) {
+        if display.is_key_pressed(FBKey::Space, KeyRepeat::No) {
             c8.set_halted(!c8.is_halted());
+        } else if display.is_key_pressed(FBKey::N, KeyRepeat::Yes) {
+            c8.set_halted(false);
+            do_one_step = true;
         }
     }
 }
@@ -114,3 +125,39 @@ fn update_key_states(c8: &mut Chip8, window: &Window) {
         }
     }
 }
+
+#[cfg(debug_assertions)]
+#[allow(unused_must_use)]
+fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
+    let mut buf = String::new();
+    buf.push_str("REGS:\n");
+    for reg in 0..c8.gpregs.len() {
+        if reg > 0 && reg % 4 == 0 {
+            buf.push_str("\n");
+        }
+        buf.push_str(&format!("V{:X} = 0x{:04X}  ", reg, c8.gpregs[reg]));
+    }
+    buf.push_str("\n");
+    buf.push_str(&format!(" I = 0x{:04X}\n\n", *c8.i_reg));
+
+    let kb = &c8.keyboard;
+    let st = |b| if b {
+        "*"
+    } else {
+        " "
+    };
+    buf.push_str(&format!("1{} 2{} 3{} C{}\n", st(kb[Key::K1]), st(kb[Key::K2]), st(kb[Key::K3]), st(kb[Key::KC])));
+    buf.push_str(&format!("4{} 5{} 6{} D{}\n", st(kb[Key::K4]), st(kb[Key::K5]), st(kb[Key::K6]), st(kb[Key::KD])));
+    buf.push_str(&format!("7{} 8{} 9{} E{}\n", st(kb[Key::K7]), st(kb[Key::K8]), st(kb[Key::K9]), st(kb[Key::KE])));
+    buf.push_str(&format!("A{} B{} 0{} F{}", st(kb[Key::KA]), st(kb[Key::K0]), st(kb[Key::KB]), st(kb[Key::KF])));
+
+    //https://stackoverflow.com/a/34837038
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
+
+    writeln!(out, "{buf}");
+    writeln!(out, "\nDT = {}\nST = {}\n", c8.dt, c8.st);
+    writeln!(out, "{:#04X} -> {ins:?}", c8.pc);
+}
+
+#[cfg(not(debug_assertions))]
+fn print_env(_: &mut impl Write, _: &Chip8, _: Instr) {}
