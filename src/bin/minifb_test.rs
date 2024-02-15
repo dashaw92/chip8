@@ -43,7 +43,7 @@ fn main() {
         },
     ).expect("Failed to create c8 display window.");
 
-
+    print!("{esc}[2J", esc = 27 as char);
     let mut do_one_step = false;
 
     while display.is_open() && !display.is_key_down(FBKey::Escape) {
@@ -126,7 +126,6 @@ fn update_key_states(c8: &mut Chip8, window: &Window) {
     }
 }
 
-#[cfg(debug_assertions)]
 #[allow(unused_must_use)]
 fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     let mut buf = String::new();
@@ -135,7 +134,7 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
         if reg > 0 && reg % 4 == 0 {
             buf.push_str("\n");
         }
-        buf.push_str(&format!("V{:X} = 0x{:04X}  ", reg, c8.gpregs[reg]));
+        buf.push_str(&format!("V{:X} = 0x{:02X}  ", reg, c8.gpregs[reg]));
     }
     buf.push_str("\n");
     buf.push_str(&format!(" I = 0x{:04X}\n\n", *c8.i_reg));
@@ -146,18 +145,19 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     } else {
         " "
     };
+    buf.push_str("KEYPAD:\n");
     buf.push_str(&format!("1{} 2{} 3{} C{}\n", st(kb[Key::K1]), st(kb[Key::K2]), st(kb[Key::K3]), st(kb[Key::KC])));
     buf.push_str(&format!("4{} 5{} 6{} D{}\n", st(kb[Key::K4]), st(kb[Key::K5]), st(kb[Key::K6]), st(kb[Key::KD])));
     buf.push_str(&format!("7{} 8{} 9{} E{}\n", st(kb[Key::K7]), st(kb[Key::K8]), st(kb[Key::K9]), st(kb[Key::KE])));
-    buf.push_str(&format!("A{} B{} 0{} F{}", st(kb[Key::KA]), st(kb[Key::K0]), st(kb[Key::KB]), st(kb[Key::KF])));
+    buf.push_str(&format!("A{} B{} 0{} F{}\n\n", st(kb[Key::KA]), st(kb[Key::K0]), st(kb[Key::KB]), st(kb[Key::KF])));
+
+    buf.push_str(&format!("TIMERS:\nDT = 0x{:02X}\nST = 0x{:02X}\n\n", c8.dt, c8.st));
+    //the extra spaces overwrite artifacts from the previous instruction
+    //do not remove. Field width on the instruction puts weird spaces in the
+    //structure.
+    buf.push_str(&format!("PC:\n0x{:04X} -> {ins:?}                                 ", c8.pc));
 
     //https://stackoverflow.com/a/34837038
-    print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-
+    print!("{esc}[1;1H", esc = 27 as char);
     writeln!(out, "{buf}");
-    writeln!(out, "\nDT = {}\nST = {}\n", c8.dt, c8.st);
-    writeln!(out, "{:#04X} -> {ins:?}", c8.pc);
 }
-
-#[cfg(not(debug_assertions))]
-fn print_env(_: &mut impl Write, _: &Chip8, _: Instr) {}
