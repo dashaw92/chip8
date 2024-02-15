@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use chip8_decode::instructions::Instr;
-use chip8_hw::chip8::{Chip8, QUIRKS_NEW, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
+use chip8_hw::chip8::{Chip8, QUIRKS_NEW, STACK_LIMIT, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
 use chip8_hw::keyboard::Key;
 use minifb::{Key as FBKey, KeyRepeat, Window, WindowOptions};
 
@@ -43,16 +43,13 @@ fn main() {
         },
     ).expect("Failed to create c8 display window.");
 
+    //Clear the terminal for the debug console output
     print!("{esc}[2J", esc = 27 as char);
     let mut do_one_step = false;
 
     while display.is_open() && !display.is_key_down(FBKey::Escape) {
         update_key_states(&mut c8, &display);
-        display.set_title(if c8.is_halted() {
-            &halted
-        } else {
-            &active
-        });
+        display.set_title(if c8.is_halted() { &halted } else { &active });
 
         if !c8.is_halted() {
             match c8.step(next_key(&display)) {
@@ -63,20 +60,14 @@ fn main() {
                 Ok(ins) => print_env(&mut out, &c8, ins),
             }
 
-            display_buf.iter_mut().enumerate()
-                .for_each(|(idx, pix)| {
-                    *pix = if c8.vram[idx] {
-                        0x00FFAA00
-                    } else {
-                        0
-                    };
-                });
+            display_buf.iter_mut()
+                .enumerate()
+                .for_each(|(idx, pix)| *pix = if c8.vram[idx] { 0x00FFAA00 } else { 0 });
         }
 
-        // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
         display
             .update_with_buffer(&display_buf, VRAM_WIDTH, VRAM_HEIGHT)
-            .unwrap();
+            .expect("Failed to update display buffer on window.");
         
         if do_one_step {
             c8.set_halted(true);
@@ -128,6 +119,12 @@ fn update_key_states(c8: &mut Chip8, window: &Window) {
 
 #[allow(unused_must_use)]
 fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
+    //https://stackoverflow.com/a/34837038
+    #[inline(always)]
+    fn move_to(out: &mut impl Write, x: usize, y: usize) {
+        let _ = write!(out, "{esc}[{y};{x}H", esc = 27 as char);
+    }
+
     let mut buf = String::new();
     buf.push_str("REGS:\n");
     for reg in 0..c8.gpregs.len() {
@@ -140,11 +137,7 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     buf.push_str(&format!(" I = 0x{:04X}\n\n", *c8.i_reg));
 
     let kb = &c8.keyboard;
-    let st = |b| if b {
-        "*"
-    } else {
-        " "
-    };
+    let st = |b| if b { "*" } else { " " };
     buf.push_str("KEYPAD:\n");
     buf.push_str(&format!("1{} 2{} 3{} C{}\n", st(kb[Key::K1]), st(kb[Key::K2]), st(kb[Key::K3]), st(kb[Key::KC])));
     buf.push_str(&format!("4{} 5{} 6{} D{}\n", st(kb[Key::K4]), st(kb[Key::K5]), st(kb[Key::K6]), st(kb[Key::KD])));
@@ -157,7 +150,24 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     //structure.
     buf.push_str(&format!("PC:\n0x{:04X} -> {ins:?}                                 ", c8.pc));
 
-    //https://stackoverflow.com/a/34837038
-    print!("{esc}[1;1H", esc = 27 as char);
+    const SP_X: usize = 46;
+    move_to(out, SP_X, 0);
+    write!(out, "STACK:");
+    for i in (0..STACK_LIMIT).rev() {
+        move_to(out, SP_X, STACK_LIMIT - i + 1);
+        if (c8.sp as usize) <= i {
+            write!(out, "{:2}: 0x0000", i);
+        } else {
+            write!(out, "{:2}: 0x{:04X}", i, c8.stack[i]);
+        }
+
+        if c8.sp as usize == i {
+            write!(out, " <- SP");
+        } else {
+            write!(out, "      ");
+        }
+    }
+    
+    move_to(out, 0, 0);
     writeln!(out, "{buf}");
 }

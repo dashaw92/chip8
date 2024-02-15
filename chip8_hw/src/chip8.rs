@@ -95,7 +95,7 @@ impl Chip8 {
             st: 0x0,
             pc: 0x200,
             sp: 0x0,
-            stack: vec![0x00; STACK_LIMIT],
+            stack: Vec::with_capacity(STACK_LIMIT),
             vram: [false; VRAM_WH],
             keyboard: Keyboard::default(),
             halted: false,
