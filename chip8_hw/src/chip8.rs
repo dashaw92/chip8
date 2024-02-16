@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use chip8_decode::instructions::Instr;
 use shared::{numtypes::u12, reg::GPReg};
 
@@ -16,8 +18,6 @@ pub struct Chip8 {
     pub ram: [u8; RAM_SIZE],
     pub gpregs: [u8; 0x10],
     pub i_reg: u12,
-    pub dt: u8,
-    pub st: u8,
     pub pc: u16,
     pub sp: u8,
     pub stack: Vec<u16>,
@@ -25,6 +25,41 @@ pub struct Chip8 {
     pub keyboard: Keyboard,
     halted: bool,
     quirks: Quirks,
+    pub timers: Timers,
+}
+
+#[derive(Debug)]
+pub struct Timers {
+    dt: u8,
+    st: u8,
+    last_tick: Instant,
+}
+
+impl Timers {
+    const HZ_60: u128 = 1_000_000_000 / 60;
+
+    fn tick(&mut self) {
+        let elapsed = self.last_tick.elapsed();
+        if elapsed.as_nanos() >= Timers::HZ_60 {
+            if self.dt > 0 {
+                self.dt -= 1;
+            }
+
+            if self.st > 0 {
+                self.st -= 1;
+            }
+
+            self.last_tick = Instant::now();
+        }
+    }
+
+    pub fn delay(&self) -> u8 {
+        self.dt
+    }
+
+    pub fn sound(&self) -> u8 {
+        self.st
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -91,8 +126,6 @@ impl Chip8 {
             ram: [0x0; RAM_SIZE],
             gpregs: [0x0; 0x10],
             i_reg: u12::of(0x0),
-            dt: 0x0,
-            st: 0x0,
             pc: 0x200,
             sp: 0x0,
             stack: Vec::with_capacity(STACK_LIMIT),
@@ -100,6 +133,11 @@ impl Chip8 {
             keyboard: Keyboard::default(),
             halted: false,
             quirks,
+            timers: Timers {
+                dt: 0,
+                st: 0,
+                last_tick: Instant::now(),
+            }
         };
 
         Self::copy_font(&mut c8.ram[0..=0x4F]);
@@ -271,7 +309,7 @@ impl Chip8 {
                     self.pc += 2;
                 }
             },
-            MOVDT(vx) => self.gpregs[vx] = self.dt,
+            MOVDT(vx) => self.gpregs[vx] = self.timers.dt,
             LDKB(vx) => {
                 let Some(key) = next_key else {
                     self.pc -= 2;
@@ -279,8 +317,8 @@ impl Chip8 {
                 };
                 self.gpregs[vx] = key as u8;
             },
-            LDDT(vx) => self.dt = self.gpregs[vx],
-            LDST(vx) => self.st = self.gpregs[vx],
+            LDDT(vx) => self.timers.dt = self.gpregs[vx],
+            LDST(vx) => self.timers.st = self.gpregs[vx],
             ADDI(vx) => self.i_reg.modify(|i| i + self.gpregs[vx] as u16),
             LDSPR(vx) => self.i_reg.modify(|_| self.gpregs[vx] as u16 * 5),
             LDBCD(vx) => {
@@ -317,14 +355,7 @@ impl Chip8 {
             },
         }
 
-        if self.dt > 0 {
-            self.dt -= 1;
-        }
-
-        if self.st > 0 {
-            self.st -= 1;
-        }
-
+        self.timers.tick();
         Ok(instr)
     }
 }

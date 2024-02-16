@@ -144,7 +144,7 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     buf.push_str(&format!("7{} 8{} 9{} E{}\n", st(kb[Key::K7]), st(kb[Key::K8]), st(kb[Key::K9]), st(kb[Key::KE])));
     buf.push_str(&format!("A{} B{} 0{} F{}\n\n", st(kb[Key::KA]), st(kb[Key::K0]), st(kb[Key::KB]), st(kb[Key::KF])));
 
-    buf.push_str(&format!("TIMERS:\nDT = 0x{:02X}\nST = 0x{:02X}\n\n", c8.dt, c8.st));
+    buf.push_str(&format!("TIMERS:\nDT = 0x{:02X}\nST = 0x{:02X}\n\n", c8.timers.delay(), c8.timers.sound()));
     //the extra spaces overwrite artifacts from the previous instruction
     //do not remove. Field width on the instruction puts weird spaces in the
     //structure.
