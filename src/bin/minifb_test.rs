@@ -24,8 +24,35 @@ static KEY_MAP: &[(FBKey, Key)] = &[
     (FBKey::V   , Key::KF),
 ];
 
+struct Scheme {
+    fg: u32,
+    bg: u32,
+}
+
+impl Scheme {
+    fn from_env() -> Scheme {
+        let default = Scheme {
+            fg: 0x00FFAA00,
+            bg: 0,
+        };
+
+        if let Some(arg) = std::env::args().skip(2).next() {
+            return match arg.to_lowercase().as_ref() {
+                "light" => Scheme {
+                    fg: 0,
+                    bg: 0x00FFFFFF,
+                },
+                _ => default,
+            }
+        }
+
+        default
+    }
+}
+
 fn main() {
     let (rom_name, mut c8) = chip8();
+    let scheme = Scheme::from_env();
     let (active, halted) = (format!("chip8 - {rom_name}"), format!("<HALTED> - chip8 - {rom_name}"));
 
     let stdout = std::io::stdout();
@@ -62,7 +89,7 @@ fn main() {
 
             display_buf.iter_mut()
                 .enumerate()
-                .for_each(|(idx, pix)| *pix = if c8.vram[idx] { 0x00FFAA00 } else { 0 });
+                .for_each(|(idx, pix)| *pix = if c8.vram[idx] { scheme.fg } else { scheme.bg });
         }
 
         display

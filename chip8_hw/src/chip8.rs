@@ -68,18 +68,21 @@ pub struct Quirks {
     pub vf_reset: bool,
     /// PUSHREG and POPREG modify the value of I
     pub memory: bool,
+    pub shifting: bool,
 }
 
 #[allow(private_interfaces)]
 pub static QUIRKS_OLD: Quirks = Quirks {
     vf_reset: true,
     memory: false,
+    shifting: false,
 };
 
 #[allow(private_interfaces)]
 pub static QUIRKS_NEW: Quirks = Quirks {
     vf_reset: true,
     memory: true,
+    shifting: false,
 };
 
 static FONT: [[u8; 5]; 0x10] = [
@@ -157,6 +160,7 @@ impl Chip8 {
         }.map_err(|e| format!("Failed to decode instruction: {e:#?}"))?;
         
         self.pc += 2;
+        self.timers.tick();
         
         use chip8_decode::instructions::Instr::*;
         match instr {
@@ -234,9 +238,16 @@ impl Chip8 {
                 self.gpregs[vx] = out;
                 self.gpregs[GPReg::VF] = !carry as u8;
             },
-            SHRC(vx, _) => {
+            SHRC(vx, vy) => {
+                let vy_val = self.gpregs[vy];
                 let vx_val = self.gpregs[vx];
-                self.gpregs[vx] >>= 1;
+
+                let mut val = vy_val;
+                if self.quirks.shifting {
+                    val = vx_val;
+                }
+
+                self.gpregs[vx] = val >> 1;
                 self.gpregs[GPReg::VF] = (vx_val & 0x1 == 1) as u8;
             },
             SUBN(vx, vy) => {
@@ -244,9 +255,16 @@ impl Chip8 {
                 self.gpregs[vx] = out;
                 self.gpregs[GPReg::VF] = !carry as u8;
             },
-            SHLC(vx, _) => {
+            SHLC(vx, vy) => {
+                let vy_val = self.gpregs[vy];
                 let vx_val = self.gpregs[vx];
-                self.gpregs[vx] <<= 1;
+
+                let mut val = vy_val;
+                if self.quirks.shifting {
+                    val = vx_val;
+                }
+
+                self.gpregs[vx] = val << 1;
                 self.gpregs[GPReg::VF] = (vx_val & 0b10000000 == 0b10000000) as u8;
             },
             SNE(vx, vy) => {
@@ -263,16 +281,8 @@ impl Chip8 {
             DRW(vx, vy, size) => {
                 self.gpregs[GPReg::VF] = 0;
 
-                let mut x_start = self.gpregs[vx] as usize;
-                let mut y_start = self.gpregs[vy] as usize;
-
-                if x_start > VRAM_WIDTH {
-                    x_start = 0;
-                }
-
-                if y_start > VRAM_HEIGHT {
-                    y_start = 0;
-                }
+                let x_start = self.gpregs[vx] as usize & 63;
+                let y_start = self.gpregs[vy] as usize & 31;
 
                 let spr = &self.ram[*self.i_reg as usize ..= (*self.i_reg + *size as u16) as usize];
                 for y in 0 .. *size {
@@ -355,7 +365,6 @@ impl Chip8 {
             },
         }
 
-        self.timers.tick();
         Ok(instr)
     }
 }
