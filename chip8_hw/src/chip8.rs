@@ -19,8 +19,8 @@ pub struct Chip8 {
     pub gpregs: [u8; 0x10],
     pub i_reg: u12,
     pub pc: u16,
-    pub sp: u8,
-    pub stack: Vec<u16>,
+    pub sp: usize,
+    pub stack: [u16; STACK_LIMIT],
     pub vram: [bool; VRAM_WH],
     pub keyboard: Keyboard,
     halted: bool,
@@ -131,7 +131,7 @@ impl Chip8 {
             i_reg: u12::of(0x0),
             pc: 0x200,
             sp: 0x0,
-            stack: Vec::with_capacity(STACK_LIMIT),
+            stack: [0x00; STACK_LIMIT],
             vram: [false; VRAM_WH],
             keyboard: Keyboard::default(),
             halted: false,
@@ -171,8 +171,9 @@ impl Chip8 {
                     return Err(format!("Stack underflow! pc = 0x{:04X}", self.pc - 2));
                 }
 
+                self.stack[self.sp] = 0;
                 self.sp -= 1;
-                self.pc = self.stack.pop().expect(&format!("Failed to pop stack when sp != 0; sp out of sync with stack? pc = 0x{:04X}", self.pc));
+                self.pc = self.stack[self.sp];
             },
             JP(addr) => {
                 if self.pc - 2 == *addr {
@@ -185,8 +186,8 @@ impl Chip8 {
                     return Err(format!("Stack overflow! pc = 0x{:04X}", self.pc - 2));
                 }
 
+                self.stack[self.sp] = self.pc;
                 self.sp += 1;
-                self.stack.push(self.pc);
                 self.pc = *addr;
             },
             SEQ(vx, lit) => {

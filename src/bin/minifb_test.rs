@@ -182,11 +182,7 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     write!(out, "STACK:");
     for i in (0..STACK_LIMIT).rev() {
         move_to(out, SP_X, STACK_LIMIT - i + 1);
-        if (c8.sp as usize) <= i {
-            write!(out, "{:2}: 0x0000", i);
-        } else {
-            write!(out, "{:2}: 0x{:04X}", i, c8.stack[i]);
-        }
+        write!(out, "{:2}: 0x{:04X}", i, c8.stack[i]);
 
         if c8.sp as usize == i {
             write!(out, " <- SP");
