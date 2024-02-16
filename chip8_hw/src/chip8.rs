@@ -1,9 +1,14 @@
-use std::time::Instant;
+pub(crate) mod font;
+pub(crate) mod timers;
+pub(crate) mod quirks;
+pub mod keyboard;
+
+pub use quirks::{QUIRKS_NEW, QUIRKS_OLD};
 
 use chip8_decode::instructions::Instr;
 use shared::{numtypes::u12, reg::GPReg};
 
-use crate::keyboard::{Key, Keyboard};
+use self::{font::FONT, keyboard::{Key, Keyboard}, quirks::Quirks, timers::Timers};
 
 pub const RAM_SIZE: usize = 0x1000;
 pub const ROM_MAX_SIZE: usize = 0xE00;
@@ -28,82 +33,6 @@ pub struct Chip8 {
     pub timers: Timers,
 }
 
-#[derive(Debug)]
-pub struct Timers {
-    dt: u8,
-    st: u8,
-    last_tick: Instant,
-}
-
-impl Timers {
-    const HZ_60: u128 = 1_000_000_000 / 60;
-
-    fn tick(&mut self) {
-        let elapsed = self.last_tick.elapsed();
-        if elapsed.as_nanos() >= Timers::HZ_60 {
-            if self.dt > 0 {
-                self.dt -= 1;
-            }
-
-            if self.st > 0 {
-                self.st -= 1;
-            }
-
-            self.last_tick = Instant::now();
-        }
-    }
-
-    pub fn delay(&self) -> u8 {
-        self.dt
-    }
-
-    pub fn sound(&self) -> u8 {
-        self.st
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct Quirks {
-    /// VF is reset to 0 for AND, OR, and XOR opcodes
-    pub vf_reset: bool,
-    /// PUSHREG and POPREG modify the value of I
-    pub memory: bool,
-    pub shifting: bool,
-}
-
-#[allow(private_interfaces)]
-pub static QUIRKS_OLD: Quirks = Quirks {
-    vf_reset: true,
-    memory: false,
-    shifting: false,
-};
-
-#[allow(private_interfaces)]
-pub static QUIRKS_NEW: Quirks = Quirks {
-    vf_reset: true,
-    memory: true,
-    shifting: false,
-};
-
-static FONT: [[u8; 5]; 0x10] = [
-    [0xF0, 0x90, 0x90, 0x90, 0xF0], //0
-    [0x20, 0x60, 0x20, 0x20, 0x70], //1
-    [0xF0, 0x10, 0xF0, 0x80, 0xF0], //2
-    [0xF0, 0x10, 0xF0, 0x10, 0xF0], //3
-    [0x90, 0x90, 0xF0, 0x10, 0x10], //4
-    [0xF0, 0x80, 0xF0, 0x10, 0xF0], //5
-    [0xF0, 0x80, 0xF0, 0x90, 0xF0], //6
-    [0xF0, 0x10, 0x20, 0x40, 0x40], //7
-    [0xF0, 0x90, 0xF0, 0x90, 0xF0], //8
-    [0xF0, 0x90, 0xF0, 0x10, 0xF0], //9
-    [0xF0, 0x90, 0xF0, 0x90, 0x90], //A
-    [0xE0, 0x90, 0xE0, 0x90, 0xE0], //B
-    [0xF0, 0x80, 0x80, 0x80, 0xF0], //C
-    [0xE0, 0x90, 0x90, 0x90, 0xE0], //D
-    [0xF0, 0x80, 0xF0, 0x80, 0xF0], //E
-    [0xF0, 0x80, 0xF0, 0x80, 0x80], //F
-];
-
 impl Chip8 {
     fn copy_font(ram: &mut [u8]) {
         assert!(ram.len() <= 5 * 0x10);
@@ -122,6 +51,10 @@ impl Chip8 {
         self.halted = halt;
     }
 
+    pub fn pixel_on(&self, idx: usize) -> bool {
+        self.vram[idx]
+    }
+
     pub fn load_rom(quirks: Quirks, rom: &[u8]) -> Self {
         assert!(rom.len() < ROM_MAX_SIZE, "ROM is too large! Must be at most {ROM_MAX_SIZE} bytes!");
 
@@ -136,11 +69,7 @@ impl Chip8 {
             keyboard: Keyboard::default(),
             halted: false,
             quirks,
-            timers: Timers {
-                dt: 0,
-                st: 0,
-                last_tick: Instant::now(),
-            }
+            timers: Timers::default(),
         };
 
         Self::copy_font(&mut c8.ram[0..=0x4F]);

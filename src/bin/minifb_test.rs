@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use chip8_decode::instructions::Instr;
+use chip8_hw::chip8::keyboard::Key;
 use chip8_hw::chip8::{Chip8, QUIRKS_NEW, STACK_LIMIT, VRAM_HEIGHT, VRAM_WH, VRAM_WIDTH};
-use chip8_hw::keyboard::Key;
 use minifb::{Key as FBKey, KeyRepeat, Window, WindowOptions};
 
 static KEY_MAP: &[(FBKey, Key)] = &[
@@ -89,7 +89,7 @@ fn main() {
 
             display_buf.iter_mut()
                 .enumerate()
-                .for_each(|(idx, pix)| *pix = if c8.vram[idx] { scheme.fg } else { scheme.bg });
+                .for_each(|(idx, pix)| *pix = if c8.pixel_on(idx) { scheme.fg } else { scheme.bg });
         }
 
         display
