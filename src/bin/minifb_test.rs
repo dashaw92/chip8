@@ -81,7 +81,7 @@ fn main() {
         if !c8.is_halted() {
             match c8.step(next_key(&display)) {
                 Err(e) => {
-                    let _ = writeln!(out, "Execution halted: {e:?}.");
+                    let _ = writeln!(out, "Execution halted: {e}.");
                     c8.set_halted(true);
                 }
                 Ok(ins) => print_env(&mut out, &c8, ins),
@@ -169,7 +169,7 @@ fn print_env(out: &mut impl Write, c8: &Chip8, ins: Instr) {
     buf.push_str(&format!("1{} 2{} 3{} C{}\n", st(kb[Key::K1]), st(kb[Key::K2]), st(kb[Key::K3]), st(kb[Key::KC])));
     buf.push_str(&format!("4{} 5{} 6{} D{}\n", st(kb[Key::K4]), st(kb[Key::K5]), st(kb[Key::K6]), st(kb[Key::KD])));
     buf.push_str(&format!("7{} 8{} 9{} E{}\n", st(kb[Key::K7]), st(kb[Key::K8]), st(kb[Key::K9]), st(kb[Key::KE])));
-    buf.push_str(&format!("A{} B{} 0{} F{}\n\n", st(kb[Key::KA]), st(kb[Key::K0]), st(kb[Key::KB]), st(kb[Key::KF])));
+    buf.push_str(&format!("A{} 0{} B{} F{}\n\n", st(kb[Key::KA]), st(kb[Key::K0]), st(kb[Key::KB]), st(kb[Key::KF])));
 
     buf.push_str(&format!("TIMERS:\nDT = 0x{:02X}\nST = 0x{:02X}\n\n", c8.timers.delay(), c8.timers.sound()));
     //the extra spaces overwrite artifacts from the previous instruction

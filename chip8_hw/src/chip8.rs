@@ -82,12 +82,16 @@ impl Chip8 {
     }
 
     pub fn step(&mut self, next_key: Option<Key>) -> Result<Instr, String> {
+        if self.pc as usize >= RAM_SIZE - 1 {
+            return Err(format!("PC beyond RAM limit! pc = 0x{:04X}", self.pc));
+        }
+
         let instr = {
             let (b1, b2) = (self.ram[self.pc as usize], self.ram[(self.pc + 1) as usize]);
             let bytes = (b1 as u16) << 8 | b2 as u16;
             Instr::decode(bytes)
         }.map_err(|e| format!("Failed to decode instruction: {e:#?}"))?;
-        
+
         self.pc += 2;
         self.timers.tick();
         
